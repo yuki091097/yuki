@@ -1,0 +1,1079 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>🧸 钩织手账 · 子项目修复+线材库</title>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8/hammer.min.js"></script>
+    <style>
+        /* 完整精致样式 —— 保持不变 */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', 'Helvetica Neue', -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
+        }
+        body {
+            background: #fad7e7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 12px;
+        }
+        #app {
+            width: 100%;
+            max-width: 390px;
+            background: #fff7fc;
+            border-radius: 40px 40px 32px 32px;
+            box-shadow: 0 20px 40px #fbb6d4, 0 6px 12px #f598c0;
+            border: 2px solid #ffbede;
+            height: 750px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+            transition: max-width 0.2s, height 0.2s;
+        }
+        @media (min-width: 600px) {
+            #app { max-width: 600px; height: 900px; }
+            .project-item { height: 130px !important; }
+            .item-actions button { width: 100px !important; font-size: 1rem !important; }
+            .edit-btn { padding: 12px 22px !important; font-size: 1.1rem !important; }
+            .item-icon { width: 3.2rem !important; height: 3.2rem !important; font-size: 3.2rem !important; }
+            .project-name { font-size: 1.5rem !important; }
+            .project-row { font-size: 1rem !important; }
+            .progress-text { font-size: 0.9rem !important; }
+            .counter-btn { width: 80px !important; height: 80px !important; font-size: 3.5rem !important; }
+            .current-row-display { font-size: 4.5rem !important; }
+            .sub-counter-btn { width: 70px !important; height: 70px !important; font-size: 3rem !important; }
+            .sub-row-display { font-size: 3.2rem !important; }
+            .note-row input { padding: 14px 18px !important; font-size: 1.1rem !important; }
+            .reset-btn { font-size: 0.9rem !important; padding: 8px 16px !important; }
+            .sub-reset-btn { font-size: 0.9rem !important; padding: 6px 14px !important; }
+        }
+
+        .view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            padding: 18px 14px;
+            transition: opacity 0.2s;
+            scrollbar-width: thin;
+            scrollbar-color: #fec7df #ffeef5;
+        }
+        .view.hidden { display: none; }
+        .view::-webkit-scrollbar { width: 4px; }
+        .view::-webkit-scrollbar-thumb { background: #fbb0d0; border-radius: 20px; }
+
+        .header {
+            display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;
+        }
+        .header h2 {
+            font-size: 1.8rem; color: #ba618b; text-shadow: 2px 2px 0 #ffdbea;
+        }
+        .icon-btn {
+            background: #ffe9f2; width: 44px; height: 44px; border-radius: 30px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.6rem; color: #b25281; box-shadow: 0 4px 6px #fbb0d0;
+            border: none; cursor: pointer;
+        }
+        .icon-btn:active { background: #fdc6dd; transform: scale(0.94); }
+
+        .project-list { flex: 1; display: flex; flex-direction: column; gap: 14px; }
+        .project-item { position: relative; width: 100%; height: 120px; border-radius: 30px; overflow: visible; touch-action: pan-y; }
+        .item-actions { position: absolute; right: 0; top: 0; height: 100%; display: flex; flex-direction: row; gap: 2px; z-index: 1; pointer-events: none; }
+        .item-actions button { 
+            width: 90px; height: 100%; border: none; font-weight: 600; background: #ffbfda; 
+            color: #4f2d3f; pointer-events: auto; border-radius: 20px; margin-left: 2px; 
+            font-size: 0.85rem; white-space: normal; line-height: 1.2; padding: 4px; word-break: break-word;
+        }
+        .item-actions .delete-btn { background: #faaac9; color: #451d30; border-top-right-radius: 30px; border-bottom-right-radius: 30px; }
+        .item-actions button:active { filter: brightness(0.92); }
+        .item-content { position: relative; z-index: 10; background: white; width: 100%; height: 100%; border-radius: 30px; padding: 0 12px; display: flex; align-items: center; gap: 8px; border: 2px solid #ffbfdc; box-shadow: 0 6px 10px #fdc9e2; transition: transform 0.2s ease; touch-action: pan-y; cursor: grab; }
+        .item-content.swiped-left { transform: translateX(-180px); }
+        .item-icon { width: 2.6rem; height: 2.6rem; border-radius: 50%; overflow: hidden; display: flex; align-items: center; justify-content: center; background: #ffe2f0; }
+        .item-icon img { width: 100%; height: 100%; object-fit: cover; }
+        .item-icon span { font-size: 2.6rem; line-height: 1; }
+        .item-info { flex: 1; min-width: 0; }
+        .project-name { font-size: 1.3rem; font-weight: 600; color: #b04f7c; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .project-row { color: #d47ca5; margin-top: 2px; font-size: 0.9rem; }
+        .edit-btn { background: #ffe2f1; border: none; padding: 8px 14px; border-radius: 40px; color: #b24679; font-weight: 600; box-shadow: 0 2px 6px #fbbcd6; cursor: pointer; }
+        .edit-btn:active { background: #fccfdf; transform: scale(0.94); }
+
+        .progress-container { margin-top: 6px; width: 100%; height: 8px; background: #ffe2f0; border-radius: 20px; overflow: hidden; }
+        .progress-bar { height: 100%; background: #ff9ec8; border-radius: 20px; width: 0%; transition: width 0.2s; }
+        .progress-text { font-size: 0.7rem; color: #a5386a; margin-left: 6px; white-space: nowrap; }
+        .row-info { display: flex; align-items: center; justify-content: space-between; }
+
+        .new-project-btn { width: 100%; background: #ffd2e8; border: 2px dashed #fc95c2; border-radius: 50px; padding: 16px; font-size: 1.3rem; color: #bd5587; font-weight: 500; text-align: center; margin-top: 20px; cursor: pointer; }
+        .new-project-btn:active { background: #fec7df; transform: scale(0.98); }
+
+        .detail-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .back-btn { background: none; border: none; font-size: 2rem; color: #cd6093; width: 44px; cursor: pointer; }
+        .project-title-edit { display: flex; align-items: center; gap: 8px; flex: 1; justify-content: center; }
+        .project-title-edit input { background: white; border: 2px solid #ffb0cf; border-radius: 40px; padding: 8px 16px; font-size: 1.2rem; width: 160px; text-align: center; color: #a5386a; font-weight: 500; outline: none; }
+        .action-buttons { display: flex; gap: 8px; }
+        .export-btn { background: #ffe0f0; border: none; padding: 8px 12px; border-radius: 40px; color: #a53d6b; font-size: 1rem; font-weight: 600; box-shadow: 0 3px 8px #f8a7ca; cursor: pointer; }
+        .export-btn:active { background: #f59ec4; transform: scale(0.94); }
+
+        /* 线材模块 (项目内) */
+        .project-yarn-list {
+            background: #fff0f8;
+            border-radius: 40px;
+            padding: 14px 12px;
+            margin: 8px 0 14px;
+            border: 2px solid #ffbddb;
+            box-shadow: inset 0 2px 6px #ffd9ec;
+        }
+        .project-yarn-item {
+            background: white;
+            border-radius: 40px;
+            padding: 10px 14px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border: 2px solid #ffb2d1;
+        }
+        .project-yarn-info { flex: 1; }
+        .project-yarn-name { font-weight: 600; color: #ac4072; }
+        .project-yarn-meta { color: #bf7fa3; font-size: 0.85rem; }
+        .remove-project-yarn { background: #ffb5cf; border: none; width: 40px; height: 40px; border-radius: 30px; font-size: 1.2rem; cursor: pointer; }
+        .select-yarn-btn { background: #ffe2f0; border: 2px dashed #ff98c4; border-radius: 40px; padding: 12px; width: 100%; font-size: 1rem; color: #b04376; font-weight: 500; margin-top: 6px; cursor: pointer; }
+
+        /* 附件模块 */
+        .attachment-section { background: #fff0f8; border-radius: 40px; padding: 14px 12px; margin: 8px 0 14px; border: 2px solid #ffbddb; box-shadow: inset 0 2px 6px #ffd9ec; }
+        .attachment-title { display: flex; align-items: center; gap: 8px; font-size: 1.2rem; color: #ad4674; margin-bottom: 10px; }
+        .attachment-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; }
+        .attachment-item { position: relative; width: 80px; height: 80px; border-radius: 20px; overflow: hidden; border: 2px solid #ffb0cf; background: white; }
+        .attachment-item img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
+        .remove-attach { position: absolute; top: 2px; right: 2px; background: #ffb0cc; border: none; width: 24px; height: 24px; border-radius: 50%; color: #491f33; font-size: 1rem; line-height: 1; cursor: pointer; }
+        .add-attach-btn { background: #ffe2f0; border: 2px dashed #ff98c4; border-radius: 40px; padding: 12px; width: 100%; font-size: 1rem; color: #b04376; font-weight: 500; margin-top: 6px; cursor: pointer; }
+
+        /* 模态框 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal.active { display: flex; }
+        .modal-content {
+            max-width: 90%;
+            max-height: 90%;
+        }
+        .modal-content img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+            border-radius: 20px;
+            border: 4px solid white;
+        }
+        .modal-close {
+            position: absolute;
+            top: 20px; right: 30px;
+            font-size: 3rem;
+            color: white;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+        }
+
+        /* 主项目区 */
+        .main-project-section { background: #fff2fb; border-radius: 40px; padding: 16px; margin: 8px 0; border: 2px solid #ffb8d9; }
+        .current-row-block { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+        .current-row-block .row-label { font-size: 1.2rem; color: #ac4a78; }
+        .current-row-display { font-size: 3.4rem; font-weight: 300; color: #b14f7f; text-shadow: 2px 2px 0 #ffcfe5; }
+        .row-adjust { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .row-adjust button { background: white; border: none; width: 60px; height: 60px; border-radius: 40px; font-size: 2.6rem; color: #cf598d; box-shadow: 0 4px 0 #dd87af; cursor: pointer; }
+        .row-adjust button:active { transform: translateY(4px); box-shadow: none; }
+        .reset-btn { background: #ffe0f0; border: 2px solid #ff98c4; padding: 6px 12px; border-radius: 30px; color: #b5487b; font-size: 0.8rem; font-weight: 600; cursor: pointer; margin-left: 4px; }
+
+        .target-row-input { display: flex; align-items: center; gap: 12px; margin: 16px 0; }
+        .target-row-input label { font-size: 1.1rem; color: #aa4173; }
+        .target-row-input input { flex: 1; background: #fff0f7; border: 2px solid #ffb0d2; border-radius: 50px; padding: 12px 16px; font-size: 1rem; }
+
+        .notes-table { background: #fcf0f8; border-radius: 32px; padding: 14px; border: 2px solid #feb1d2; max-height: 200px; overflow-y: auto; margin: 12px 0; }
+        .note-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+        .note-row .row-num { min-width: 48px; color: #b14273; font-weight: 600; }
+        .note-row input { flex: 1; background: white; border: 2px solid #ffb7d9; border-radius: 40px; padding: 10px 14px; font-size: 0.95rem; }
+
+        /* 子项目卡片 */
+        .subprojects-container { margin: 14px 0 10px; }
+        .subproject-card { background: #ffe7f2; border-radius: 40px; padding: 16px 14px; margin-bottom: 20px; border: 2px solid #ffb2d1; box-shadow: 0 4px 8px #fbc2da; }
+        .subproject-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .subproject-header-left { display: flex; align-items: center; gap: 8px; flex: 1; }
+        .collapse-btn { background: none; border: none; font-size: 1.8rem; color: #ba5585; width: 40px; height: 40px; cursor: pointer; line-height: 1; }
+        .subproject-header input { background: white; border: 2px solid #ffafcf; border-radius: 40px; padding: 8px 16px; font-size: 1.1rem; flex: 1; outline: none; }
+        .remove-sub { background: #ffb5cf; border: none; width: 44px; height: 44px; border-radius: 30px; font-size: 1.4rem; color: #411e2e; cursor: pointer; }
+
+        .subproject-details { transition: all 0.2s; }
+        .subproject-details.collapsed { display: none; }
+
+        .sub-target { display: flex; align-items: center; gap: 8px; margin: 12px 0 8px; }
+        .sub-target label { color: #a33d6b; }
+        .sub-target input { width: 100px; background: #ffeef5; border: 2px solid #ffafcf; border-radius: 40px; padding: 8px; text-align: center; }
+
+        .subproject-counter { display: flex; align-items: center; justify-content: space-between; background: #fff0f9; border-radius: 60px; padding: 8px 12px; margin: 10px 0; border: 2px solid #ffafd0; }
+        .sub-counter-btn { background: white; border: none; width: 50px; height: 50px; border-radius: 30px; font-size: 2.2rem; color: #c45185; box-shadow: 0 3px 0 #dd87af; cursor: pointer; }
+        .sub-counter-btn:active { transform: translateY(3px); box-shadow: none; }
+        .sub-row-display { font-size: 2.6rem; color: #a13969; }
+        .sub-reset-btn { background: #ffe0f0; border: 2px solid #ff98c4; padding: 6px 12px; border-radius: 30px; color: #b5487b; font-size: 0.9rem; font-weight: 600; cursor: pointer; margin-left: 6px; }
+
+        .add-subproject-btn { background: #ffd9ec; border: 2px dashed #ff9ec8; border-radius: 50px; padding: 16px; width: 100%; font-size: 1.2rem; color: #b5487b; margin: 10px 0; cursor: pointer; }
+
+        .sum-target-badge { background: #ffd5e9; border-radius: 60px; padding: 14px 20px; text-align: center; font-size: 1.3rem; color: #ac4072; margin: 10px 0; border: 2px solid #ff9bc2; }
+
+        /* 线材库卡片 */
+        .yarn-library-list { display: flex; flex-direction: column; gap: 12px; margin-top: 10px; }
+        .yarn-card {
+            background: white; border-radius: 28px; padding: 14px; border: 2px solid #ffbedb;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .yarn-info { flex: 1; }
+        .yarn-name { font-weight: 700; color: #a5386a; font-size: 1.2rem; }
+        .yarn-detail { color: #bf6190; font-size: 0.9rem; margin-top: 4px; }
+        .yarn-actions { display: flex; gap: 8px; }
+        .yarn-actions button { background: #ffd0e6; border: none; width: 44px; height: 44px; border-radius: 30px; font-size: 1.2rem; cursor: pointer; }
+
+        /* 线材表单模态框 */
+        .modal-card {
+            background: #fff2fb; width: 85%; max-width: 340px; border-radius: 48px; padding: 24px;
+            border: 3px solid #ffb8d9; box-shadow: 0 10px 20px #e58eb6;
+        }
+        .modal-card h3 { color: #b5487b; margin-bottom: 20px; font-size: 1.8rem; }
+        .modal-card input, .modal-card textarea {
+            width: 100%; background: white; border: 2px solid #ffafcf; border-radius: 40px;
+            padding: 12px 18px; font-size: 1rem; margin-bottom: 16px; outline: none;
+        }
+        .modal-card textarea { border-radius: 24px; resize: vertical; }
+        .modal-actions { display: flex; gap: 12px; justify-content: center; }
+        .modal-actions button { background: #ffc7e0; border: none; padding: 12px 24px; border-radius: 40px; font-size: 1.1rem; color: #4f1f36; font-weight: 600; cursor: pointer; }
+
+        /* 线材选择器列表 */
+        .selector-list { max-height: 400px; overflow-y: auto; margin: 20px 0; }
+        .selector-item {
+            background: white; border-radius: 60px; padding: 14px 20px; margin-bottom: 10px;
+            border: 2px solid #ffafcf; display: flex; align-items: center; gap: 12px; cursor: pointer;
+        }
+        .selector-item:hover { background: #ffe5f2; }
+        .selector-item span { font-size: 1.2rem; color: #b5487b; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <!-- 项目列表页 -->
+    <div id="listView" class="view">
+        <div class="header">
+            <h2>🧶 钩织花园</h2>
+            <button class="icon-btn" id="goToYarnLibraryBtn">🧵</button>
+        </div>
+        <div id="projectListContainer" class="project-list"></div>
+        <button id="newProjectBtn" class="new-project-btn">➕ 新建钩织项目</button>
+    </div>
+
+    <!-- 全局线材库页 -->
+    <div id="yarnLibraryView" class="view hidden">
+        <div class="header">
+            <button class="back-btn" id="backFromYarnLibraryBtn">◀</button>
+            <h2>🧵 线材仓库</h2>
+            <button class="icon-btn" id="addYarnToLibraryBtn">➕</button>
+        </div>
+        <div id="yarnLibraryList" class="yarn-library-list"></div>
+    </div>
+
+    <!-- 项目详情页 -->
+    <div id="detailView" class="view hidden">
+        <div class="detail-header">
+            <button class="back-btn" id="backToListBtn">◀</button>
+            <div class="project-title-edit">
+                <input type="text" id="projectNameInput" placeholder="项目名称" value="">
+            </div>
+            <div class="action-buttons">
+                <button class="export-btn" id="exportProjectBtn">📤</button>
+            </div>
+        </div>
+        <!-- 项目图片 -->
+        <div style="display: flex; justify-content: center; margin-bottom: 8px;">
+            <div class="item-icon" id="projectImagePreview" style="width:4rem; height:4rem; cursor:pointer;"><span>🧶</span></div>
+            <input type="file" id="imageUploadInput" accept="image/*" style="display: none;">
+        </div>
+
+        <!-- 线材模块（引用库） -->
+        <div class="project-yarn-list">
+            <div style="font-size:1.2rem; color:#ad4674; margin-bottom:12px;">🧵 项目线材</div>
+            <div id="projectYarnContainer"></div>
+            <button id="openYarnSelectorBtn" class="select-yarn-btn">➕ 从线材库添加</button>
+        </div>
+
+        <!-- 图解附件库 -->
+        <div class="attachment-section">
+            <div class="attachment-title"><span>📎 图解附件</span></div>
+            <div id="attachmentGrid" class="attachment-grid"></div>
+            <button id="addAttachmentBtn" class="add-attach-btn">➕ 添加图片</button>
+            <input type="file" id="attachUploadInput" accept="image/*" multiple style="display: none;">
+        </div>
+
+        <!-- 动态区域：主项目/子项目 -->
+        <div id="mainProjectArea"></div>
+        <div id="subprojectsArea" class="subprojects-container"></div>
+        <button id="addSubprojectBtn" class="add-subproject-btn">➕ 添加子项目</button>
+        <div id="targetSumDisplay" class="sum-target-badge" style="display: none;">🎯 子项目目标行数和: 0</div>
+    </div>
+
+    <!-- 图片放大模态框 -->
+    <div id="imageModal" class="modal">
+        <button class="modal-close" id="modalClose">&times;</button>
+        <div class="modal-content" id="modalContent"></div>
+    </div>
+
+    <!-- 新增/编辑线材模态框 -->
+    <div id="yarnFormModal" class="modal">
+        <div class="modal-card">
+            <h3 id="yarnModalTitle">新增线材</h3>
+            <input type="text" id="yarnName" placeholder="名称 *" value="">
+            <input type="text" id="yarnBrand" placeholder="品牌/店家" value="">
+            <input type="text" id="yarnColor" placeholder="颜色" value="">
+            <input type="text" id="yarnThickness" placeholder="粗细" value="">
+            <textarea id="yarnNotes" placeholder="备注（可选）" rows="2"></textarea>
+            <div class="modal-actions">
+                <button id="saveYarnBtn">保存</button>
+                <button id="cancelYarnModal">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 选择线材模态框 -->
+    <div id="yarnSelectorModal" class="modal">
+        <div class="modal-card" style="max-width: 380px;">
+            <h3>选择线材</h3>
+            <div id="yarnSelectorList" class="selector-list"></div>
+            <div class="modal-actions">
+                <button id="closeSelectorModal">取消</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // ---------- 全局数据结构 ----------
+    let projects = [];
+    let yarnLibrary = [];
+    let currentProjectId = null;
+    let editingYarnId = null;
+
+    const STORAGE_KEY = 'crochet_advanced_v2';
+
+    function loadFromStorage() {
+        const stored = localStorage.getItem(STORAGE_KEY);
+        if (stored) {
+            try {
+                const data = JSON.parse(stored);
+                if (data && Array.isArray(data.projects) && Array.isArray(data.yarnLibrary)) {
+                    projects = data.projects;
+                    yarnLibrary = data.yarnLibrary;
+                } else if (Array.isArray(data)) {
+                    projects = data;
+                    yarnLibrary = [];
+                    migrateOldYarns();
+                } else {
+                    projects = [];
+                    yarnLibrary = [];
+                }
+            } catch {
+                projects = [];
+                yarnLibrary = [];
+            }
+        } else {
+            projects = [
+                { id: '1', name: '🌸 彩虹盖毯', icon: '🧶', currentRow: 8, targetRows: 20, image: null,
+                  yarns: [], rowsNote: { 1:'粉色',2:'粉色',3:'白色' }, subprojects: [], attachments: [] },
+                { id: '2', name: '🧸 小熊帽', icon: '🧸', currentRow: 5, targetRows: 16, image: null,
+                  yarns: [], rowsNote: {}, subprojects: [], attachments: [] }
+            ];
+            yarnLibrary = [
+                { id: 'y1', name: '樱花粉', brand: '暖暖家', color: '粉色', thickness: '中粗', notes: '棉线' },
+                { id: 'y2', name: '奶油白', brand: '暖暖家', color: '白色', thickness: '中粗', notes: '' }
+            ];
+            projects[0].yarns = [ { yarnId: 'y1' } ];
+            projects[1].yarns = [ { yarnId: 'y2' } ];
+        }
+    }
+
+    function migrateOldYarns() {
+        let changed = false;
+        projects.forEach(proj => {
+            if (proj.yarns && Array.isArray(proj.yarns) && proj.yarns.length && proj.yarns[0] && proj.yarns[0].yarnId === undefined) {
+                const newYarns = [];
+                proj.yarns.forEach(oldYarn => {
+                    const thickness = oldYarn.thickness || '';
+                    const brand = oldYarn.shop || '';
+                    const color = oldYarn.color || '';
+                    let existing = yarnLibrary.find(y => y.brand === brand && y.color === color && y.thickness === thickness);
+                    if (!existing) {
+                        const name = color ? (color + (thickness ? '·'+thickness : '')) : '新线材';
+                        existing = { id: 'yarn_' + Date.now() + Math.random().toString(36).substr(2, 6), name, brand, color, thickness, notes: '' };
+                        yarnLibrary.push(existing);
+                    }
+                    newYarns.push({ yarnId: existing.id });
+                });
+                proj.yarns = newYarns;
+                changed = true;
+            } else {
+                proj.yarns = proj.yarns || [];
+            }
+        });
+        if (changed) saveProjects();
+    }
+
+    function saveProjects() {
+        const data = { projects, yarnLibrary };
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+        if (listView && !listView.classList.contains('hidden')) {
+            renderProjectList();
+        }
+        if (!detailView.classList.contains('hidden') && currentProjectId) {
+            const proj = projects.find(p => p.id == currentProjectId);
+            if (proj) renderProjectYarns(proj);
+        }
+    }
+
+    // ---------- DOM 元素 ----------
+    const listView = document.getElementById('listView');
+    const detailView = document.getElementById('detailView');
+    const yarnLibraryView = document.getElementById('yarnLibraryView');
+    const projectListEl = document.getElementById('projectListContainer');
+    const newProjectBtn = document.getElementById('newProjectBtn');
+    const backToListBtn = document.getElementById('backToListBtn');
+    const backFromYarnLibraryBtn = document.getElementById('backFromYarnLibraryBtn');
+    const goToYarnLibraryBtn = document.getElementById('goToYarnLibraryBtn');
+    const addYarnToLibraryBtn = document.getElementById('addYarnToLibraryBtn');
+    const exportBtn = document.getElementById('exportProjectBtn');
+    const projectNameInput = document.getElementById('projectNameInput');
+    const imageUploadInput = document.getElementById('imageUploadInput');
+    const projectImagePreview = document.getElementById('projectImagePreview');
+    const attachUploadInput = document.getElementById('attachUploadInput');
+    const addAttachmentBtn = document.getElementById('addAttachmentBtn');
+    const attachmentGrid = document.getElementById('attachmentGrid');
+    const addSubprojectBtn = document.getElementById('addSubprojectBtn');
+    const modal = document.getElementById('imageModal');
+    const modalContent = document.getElementById('modalContent');
+    const modalClose = document.getElementById('modalClose');
+    const yarnFormModal = document.getElementById('yarnFormModal');
+    const yarnModalTitle = document.getElementById('yarnModalTitle');
+    const yarnName = document.getElementById('yarnName');
+    const yarnBrand = document.getElementById('yarnBrand');
+    const yarnColor = document.getElementById('yarnColor');
+    const yarnThickness = document.getElementById('yarnThickness');
+    const yarnNotes = document.getElementById('yarnNotes');
+    const saveYarnBtn = document.getElementById('saveYarnBtn');
+    const cancelYarnModal = document.getElementById('cancelYarnModal');
+    const yarnSelectorModal = document.getElementById('yarnSelectorModal');
+    const yarnSelectorList = document.getElementById('yarnSelectorList');
+    const closeSelectorModal = document.getElementById('closeSelectorModal');
+
+    function hideAllSwipedMenus() {
+        document.querySelectorAll('.item-content.swiped-left').forEach(el => el.classList.remove('swiped-left'));
+    }
+
+    function escapeHtml(unsafe) {
+        if (!unsafe) return '';
+        return String(unsafe).replace(/[&<>"]/g, function(m) {
+            if (m === '&') return '&amp;'; if (m === '<') return '&lt;'; if (m === '>') return '&gt;'; if (m === '"') return '&quot;';
+            return m;
+        });
+    }
+
+    // 导航
+    function showList() {
+        listView.classList.remove('hidden');
+        detailView.classList.add('hidden');
+        yarnLibraryView.classList.add('hidden');
+        renderProjectList();
+    }
+    function showDetail(pid) {
+        currentProjectId = pid;
+        const proj = projects.find(p => p.id == pid);
+        if (!proj) return;
+        proj.yarns = proj.yarns || [];
+        proj.attachments = proj.attachments || [];
+        proj.subprojects = proj.subprojects || [];
+        proj.rowsNote = proj.rowsNote || {};
+
+        projectImagePreview.innerHTML = proj.image ? `<img src="${proj.image}" style="width:100%;height:100%;object-fit:cover;">` : `<span>${proj.icon || '🧶'}</span>`;
+        projectNameInput.value = proj.name;
+
+        renderProjectYarns(proj);
+        renderAttachments(proj.attachments);
+        renderMainOrSub(proj);
+        renderSubprojects(proj.subprojects, proj);
+        updateTargetSum(proj);
+
+        listView.classList.add('hidden');
+        yarnLibraryView.classList.add('hidden');
+        detailView.classList.remove('hidden');
+    }
+    function showYarnLibrary() {
+        listView.classList.add('hidden');
+        detailView.classList.add('hidden');
+        yarnLibraryView.classList.remove('hidden');
+        renderYarnLibrary();
+    }
+
+    // 渲染线材库
+    function renderYarnLibrary() {
+        const container = document.getElementById('yarnLibraryList');
+        container.innerHTML = '';
+        if (yarnLibrary.length === 0) {
+            container.innerHTML = '<div style="color:#ca80a5; padding:16px;">暂无线材，点击➕添加</div>';
+            return;
+        }
+        yarnLibrary.forEach((yarn) => {
+            const card = document.createElement('div'); card.className = 'yarn-card';
+            card.innerHTML = `
+                <div class="yarn-info">
+                    <div class="yarn-name">${escapeHtml(yarn.name)}</div>
+                    <div class="yarn-detail">${escapeHtml(yarn.brand || '')} · ${escapeHtml(yarn.color || '')} · ${escapeHtml(yarn.thickness || '')}</div>
+                    ${yarn.notes ? `<div style="font-size:0.8rem;color:#b26b93;">📝 ${escapeHtml(yarn.notes)}</div>` : ''}
+                </div>
+                <div class="yarn-actions">
+                    <button class="edit-yarn-btn" data-id="${yarn.id}">✏️</button>
+                    <button class="delete-yarn-btn" data-id="${yarn.id}">🗑️</button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function openYarnModal(editId = null) {
+        editingYarnId = editId;
+        yarnFormModal.classList.add('active');
+        if (editId) {
+            const yarn = yarnLibrary.find(y => y.id === editId);
+            if (yarn) {
+                yarnModalTitle.innerText = '编辑线材';
+                yarnName.value = yarn.name || '';
+                yarnBrand.value = yarn.brand || '';
+                yarnColor.value = yarn.color || '';
+                yarnThickness.value = yarn.thickness || '';
+                yarnNotes.value = yarn.notes || '';
+            }
+        } else {
+            yarnModalTitle.innerText = '新增线材';
+            yarnName.value = ''; yarnBrand.value = ''; yarnColor.value = ''; yarnThickness.value = ''; yarnNotes.value = '';
+        }
+    }
+
+    function saveYarnFromModal() {
+        const name = yarnName.value.trim();
+        if (!name) { alert('线材名称不能为空'); return; }
+        if (editingYarnId) {
+            const yarn = yarnLibrary.find(y => y.id === editingYarnId);
+            if (yarn) {
+                yarn.name = name;
+                yarn.brand = yarnBrand.value.trim();
+                yarn.color = yarnColor.value.trim();
+                yarn.thickness = yarnThickness.value.trim();
+                yarn.notes = yarnNotes.value.trim();
+            }
+        } else {
+            const newId = 'yarn_' + Date.now() + Math.random().toString(36).substr(2, 6);
+            yarnLibrary.push({
+                id: newId,
+                name: name,
+                brand: yarnBrand.value.trim(),
+                color: yarnColor.value.trim(),
+                thickness: yarnThickness.value.trim(),
+                notes: yarnNotes.value.trim()
+            });
+        }
+        saveProjects();
+        renderYarnLibrary();
+        yarnFormModal.classList.remove('active');
+        if (!detailView.classList.contains('hidden') && currentProjectId) {
+            const proj = projects.find(p => p.id == currentProjectId);
+            if (proj) renderProjectYarns(proj);
+        }
+    }
+
+    function deleteYarn(yarnId) {
+        const refProjects = projects.filter(p => p.yarns && p.yarns.some(y => y.yarnId === yarnId));
+        if (refProjects.length > 0) {
+            const names = refProjects.map(p => p.name).join('、');
+            if (!confirm(`线材"${yarnLibrary.find(y=>y.id===yarnId)?.name}" 被项目 [${names}] 引用。删除后将自动从项目中移除引用。确定吗？`)) return;
+            refProjects.forEach(p => {
+                p.yarns = p.yarns.filter(y => y.yarnId !== yarnId);
+            });
+        }
+        yarnLibrary = yarnLibrary.filter(y => y.id !== yarnId);
+        saveProjects();
+        renderYarnLibrary();
+        if (!detailView.classList.contains('hidden') && currentProjectId) {
+            const proj = projects.find(p => p.id == currentProjectId);
+            if (proj) renderProjectYarns(proj);
+        }
+    }
+
+    function renderProjectYarns(proj) {
+        const container = document.getElementById('projectYarnContainer');
+        container.innerHTML = '';
+        if (!proj.yarns || proj.yarns.length === 0) {
+            container.innerHTML = '<div style="color:#b682a5; padding:10px;">尚未添加线材</div>';
+            return;
+        }
+        proj.yarns.forEach((ref, idx) => {
+            const yarn = yarnLibrary.find(y => y.id === ref.yarnId);
+            if (!yarn) return;
+            const div = document.createElement('div'); div.className = 'project-yarn-item';
+            div.innerHTML = `
+                <div class="project-yarn-info">
+                    <span class="project-yarn-name">${escapeHtml(yarn.name)}</span>
+                    <span class="project-yarn-meta">  ${escapeHtml(yarn.brand || '')} · ${escapeHtml(yarn.color || '')} · ${escapeHtml(yarn.thickness || '')}</span>
+                </div>
+                <button class="remove-project-yarn" data-idx="${idx}">✕</button>
+            `;
+            container.appendChild(div);
+        });
+    }
+
+    function openYarnSelector() {
+        const listDiv = document.getElementById('yarnSelectorList');
+        listDiv.innerHTML = '';
+        if (yarnLibrary.length === 0) {
+            listDiv.innerHTML = '<div style="padding:20px; color:#b5487b;">线材库为空，请先去添加线材</div>';
+        } else {
+            yarnLibrary.forEach(yarn => {
+                const item = document.createElement('div'); item.className = 'selector-item';
+                item.dataset.id = yarn.id;
+                item.innerHTML = `<span>${escapeHtml(yarn.name)}</span><span style="color:#b77fa5;">${escapeHtml(yarn.brand)} ${escapeHtml(yarn.color)}</span>`;
+                listDiv.appendChild(item);
+            });
+        }
+        yarnSelectorModal.classList.add('active');
+    }
+
+    function addYarnRefToCurrentProject(yarnId) {
+        const proj = projects.find(p => p.id == currentProjectId);
+        if (!proj) return;
+        if (!proj.yarns) proj.yarns = [];
+        if (!proj.yarns.some(r => r.yarnId === yarnId)) {
+            proj.yarns.push({ yarnId });
+        } else {
+            alert('该项目已添加此线材');
+        }
+        renderProjectYarns(proj);
+        saveProjects();
+        yarnSelectorModal.classList.remove('active');
+    }
+
+    // 附件渲染
+    function renderAttachments(attachments) {
+        attachmentGrid.innerHTML = '';
+        if (!attachments.length) {
+            attachmentGrid.innerHTML = '<div style="color:#d48bb0; padding:8px;">暂无图解，点击添加</div>';
+            return;
+        }
+        attachments.forEach((src, idx) => {
+            const div = document.createElement('div'); div.className = 'attachment-item';
+            div.innerHTML = `<img src="${src}" class="preview-img" data-src="${src}"><button class="remove-attach" data-index="${idx}">✕</button>`;
+            attachmentGrid.appendChild(div);
+        });
+        document.querySelectorAll('.preview-img').forEach(img => {
+            img.addEventListener('click', function(e) {
+                const src = this.dataset.src;
+                modalContent.innerHTML = `<img src="${src}">`;
+                modal.classList.add('active');
+            });
+        });
+    }
+
+    // 主项目/子项目渲染函数
+    function fillDefaultRowNotes(obj, target) {
+        if (!obj.rowsNote) obj.rowsNote = {};
+        for (let i = 1; i <= target; i++) {
+            if (obj.rowsNote[i] === undefined) obj.rowsNote[i] = '';
+        }
+    }
+    function renderMainOrSub(proj) {
+        const area = document.getElementById('mainProjectArea');
+        if (!proj.subprojects.length) {
+            fillDefaultRowNotes(proj, proj.targetRows || 10);
+            let html = `
+                <div class="main-project-section">
+                    <div class="current-row-block">
+                        <span class="row-label">当前行数</span>
+                        <span class="current-row-display" id="mainCurrentRow">${proj.currentRow || 0}</span>
+                        <div class="row-adjust">
+                            <button id="mainDecrBtn">−</button>
+                            <button id="mainIncrBtn">+</button>
+                            <button class="reset-btn" id="mainResetBtn">重置</button>
+                        </div>
+                    </div>
+                    <div class="target-row-input">
+                        <label>🎯 目标行数</label>
+                        <input type="number" id="mainTargetRows" min="1" value="${proj.targetRows || 10}">
+                    </div>
+                    <div class="notes-table" id="mainNotesTable"></div>
+                </div>
+            `;
+            area.innerHTML = html;
+            let tableHtml = '';
+            for (let r = 1; r <= (proj.targetRows||10); r++) {
+                let val = proj.rowsNote[r] || '';
+                tableHtml += `<div class="note-row"><span class="row-num">行${r}</span><input class="row-note-input" data-row="${r}" value="${escapeHtml(val)}" placeholder="备注"></div>`;
+            }
+            document.getElementById('mainNotesTable').innerHTML = tableHtml;
+
+            document.getElementById('mainDecrBtn').onclick = () => {
+                let cur = parseInt(document.getElementById('mainCurrentRow').innerText);
+                if (cur>0) { cur--; document.getElementById('mainCurrentRow').innerText = cur; proj.currentRow = cur; saveProjects(); }
+            };
+            document.getElementById('mainIncrBtn').onclick = () => {
+                let cur = parseInt(document.getElementById('mainCurrentRow').innerText);
+                let target = parseInt(document.getElementById('mainTargetRows').value,10)||10;
+                if (cur<target) { cur++; document.getElementById('mainCurrentRow').innerText = cur; proj.currentRow = cur; saveProjects(); }
+            };
+            document.getElementById('mainResetBtn').onclick = () => {
+                if (confirm('重置为0?')) { proj.currentRow = 0; document.getElementById('mainCurrentRow').innerText = 0; saveProjects(); }
+            };
+            document.getElementById('mainTargetRows').onchange = (e) => {
+                proj.targetRows = parseInt(e.target.value,10)||1;
+                fillDefaultRowNotes(proj, proj.targetRows);
+                renderMainOrSub(proj);
+                saveProjects();
+            };
+            document.querySelectorAll('#mainNotesTable .row-note-input').forEach(inp => {
+                inp.oninput = (e) => {
+                    proj.rowsNote[e.target.dataset.row] = e.target.value;
+                    saveProjects();
+                };
+            });
+        } else area.innerHTML = '';
+    }
+    function renderSubprojects(subprojects, parentProj) {
+        const area = document.getElementById('subprojectsArea');
+        area.innerHTML = '';
+        if (!subprojects.length) {
+            area.innerHTML = '<div style="color:#ca80a5; padding:16px;">🌸 暂无子项目</div>';
+            return;
+        }
+        subprojects.forEach((sub, idx) => {
+            sub.rowsNote = sub.rowsNote || {};
+            sub.targetRows = sub.targetRows || 10;
+            sub.collapsed = sub.collapsed || false;
+            fillDefaultRowNotes(sub, sub.targetRows);
+            let tableHtml = '';
+            for (let r = 1; r <= sub.targetRows; r++) {
+                let val = sub.rowsNote[r] || '';
+                tableHtml += `<div class="note-row"><span class="row-num">行${r}</span><input class="sub-note-input-${idx}" data-row="${r}" value="${escapeHtml(val)}" placeholder="备注"></div>`;
+            }
+            const card = document.createElement('div'); card.className = 'subproject-card';
+            card.innerHTML = `
+                <div class="subproject-header">
+                    <div class="subproject-header-left">
+                        <button class="collapse-btn" data-subidx="${idx}">${sub.collapsed ? '▶' : '▼'}</button>
+                        <input type="text" class="sub-name" data-subidx="${idx}" value="${escapeHtml(sub.name || '子项目')}" placeholder="子项目名">
+                    </div>
+                    <button class="remove-sub" data-subidx="${idx}">🗑️</button>
+                </div>
+                <div class="subproject-details ${sub.collapsed ? 'collapsed' : ''}">
+                    <div class="sub-target">
+                        <label>🎯 目标行数</label>
+                        <input type="number" class="sub-target-input" data-subidx="${idx}" value="${sub.targetRows}" min="1">
+                    </div>
+                    <div class="subproject-counter">
+                        <button class="sub-counter-btn sub-decr" data-subidx="${idx}">−</button>
+                        <span class="sub-row-display" id="subRowDisplay_${idx}">${sub.currentRow||0}</span>
+                        <button class="sub-counter-btn sub-incr" data-subidx="${idx}">+</button>
+                        <button class="sub-reset-btn" data-subidx="${idx}">重置</button>
+                    </div>
+                    <div class="notes-table sub-notes-table" id="subNotesTable_${idx}">${tableHtml}</div>
+                </div>
+            `;
+            area.appendChild(card);
+        });
+    }
+
+    function updateTargetSum(proj) {
+        const el = document.getElementById('targetSumDisplay');
+        if (proj.subprojects?.length) {
+            const sum = proj.subprojects.reduce((acc, sub) => acc + (sub.targetRows || 0), 0);
+            el.style.display = 'block'; el.innerText = `🎯 子项目目标行数和: ${sum}`;
+        } else el.style.display = 'none';
+    }
+
+    function exportProject() {
+        const proj = projects.find(p => p.id == currentProjectId);
+        if (!proj) return;
+        let content = `🧶 钩织项目：${proj.name}\n当前行数：${proj.currentRow||1} / ${proj.targetRows||'?'}\n`;
+        content += `🧵 线材：\n`;
+        (proj.yarns || []).forEach(ref => {
+            const y = yarnLibrary.find(yy => yy.id === ref.yarnId);
+            if (y) content += `   · ${y.name} (${y.brand} ${y.color} ${y.thickness})\n`;
+        });
+        alert('导出内容已打印在控制台');
+        console.log(content);
+    }
+
+    // ---------- 事件绑定 ----------
+    document.addEventListener('click', function(e) {
+        const target = e.target;
+
+        if (target.id === 'newProjectBtn') {
+            const newId = Date.now().toString();
+            projects.push({ id: newId, name: '新裙子', icon: '🎀', currentRow: 0, targetRows: 12, yarns: [], subprojects: [], rowsNote: {}, image: null, attachments: [] });
+            saveProjects(); showDetail(newId); return;
+        }
+        if (target.id === 'backToListBtn') { showList(); return; }
+        if (target.id === 'goToYarnLibraryBtn') { showYarnLibrary(); return; }
+        if (target.id === 'backFromYarnLibraryBtn') { showList(); return; }
+        if (target.id === 'addYarnToLibraryBtn') { openYarnModal(); return; }
+        if (target.id === 'cancelYarnModal') { yarnFormModal.classList.remove('active'); return; }
+        if (target.id === 'saveYarnBtn') { saveYarnFromModal(); return; }
+        if (target.id === 'openYarnSelectorBtn') { openYarnSelector(); return; }
+        if (target.id === 'closeSelectorModal') { yarnSelectorModal.classList.remove('active'); return; }
+        if (target.id === 'exportProjectBtn') { exportProject(); return; }
+        // 添加子项目
+        if (target.id === 'addSubprojectBtn') {
+            e.preventDefault();
+            const proj = projects.find(p => p.id == currentProjectId);
+            if (proj) {
+                const newSub = {
+                    id: Date.now() + '-' + Math.random(),
+                    name: '新子项目',
+                    currentRow: 0,
+                    targetRows: 10,
+                    rowsNote: {},
+                    collapsed: false
+                };
+                proj.subprojects.push(newSub);
+                showDetail(currentProjectId);
+                saveProjects();
+            }
+            return;
+        }
+
+        if (target.classList.contains('edit-yarn-btn')) {
+            const id = target.dataset.id; openYarnModal(id); return;
+        }
+        if (target.classList.contains('delete-yarn-btn')) {
+            const id = target.dataset.id; deleteYarn(id); return;
+        }
+        if (target.closest('.selector-item')) {
+            const item = target.closest('.selector-item');
+            const yarnId = item.dataset.id;
+            if (yarnId) addYarnRefToCurrentProject(yarnId);
+            return;
+        }
+        if (target.classList.contains('remove-project-yarn')) {
+            const idx = target.dataset.idx;
+            const proj = projects.find(p => p.id == currentProjectId);
+            if (proj && proj.yarns) {
+                proj.yarns.splice(idx, 1);
+                renderProjectYarns(proj);
+                saveProjects();
+            }
+            return;
+        }
+
+        // 项目列表操作
+        if (target.classList.contains('rename-btn')) {
+            const id = target.dataset.id; const proj = projects.find(p => p.id == id);
+            if (proj) { const n = prompt('新名称', proj.name); if (n && n.trim()) { proj.name = n.trim(); saveProjects(); renderProjectList(); } }
+            hideAllSwipedMenus(); return;
+        }
+        if (target.classList.contains('delete-btn')) {
+            const id = target.dataset.id; if (confirm('删除项目？')) { projects = projects.filter(p => p.id != id); saveProjects(); renderProjectList(); }
+            hideAllSwipedMenus(); return;
+        }
+        if (target.classList.contains('edit-btn')) {
+            const id = target.dataset.id; if (id) showDetail(id); return;
+        }
+
+        // 子项目内部事件
+        if (target.classList.contains('collapse-btn')) {
+            const idx = target.dataset.subidx;
+            const proj = projects.find(p => p.id == currentProjectId);
+            if (proj && proj.subprojects[idx]) {
+                proj.subprojects[idx].collapsed = !proj.subprojects[idx].collapsed;
+                renderSubprojects(proj.subprojects, proj);
+                saveProjects();
+            }
+            return;
+        }
+        if (target.classList.contains('remove-sub')) {
+            const idx = target.dataset.subidx;
+            const proj = projects.find(p => p.id == currentProjectId);
+            if (proj && proj.subprojects) {
+                proj.subprojects.splice(idx, 1);
+                renderSubprojects(proj.subprojects, proj);
+                updateTargetSum(proj);
+                saveProjects();
+            }
+            return;
+        }
+        if (target.classList.contains('sub-decr') || target.classList.contains('sub-incr')) {
+            const idx = target.dataset.subidx;
+            const proj = projects.find(p => p.id == currentProjectId);
+            if (!proj || !proj.subprojects[idx]) return;
+            const sub = proj.subprojects[idx];
+            const isDecr = target.classList.contains('sub-decr');
+            if (isDecr && sub.currentRow > 0) { sub.currentRow--; } 
+            else if (!isDecr && sub.currentRow < sub.targetRows) { sub.currentRow++; }
+            const display = document.getElementById(`subRowDisplay_${idx}`);
+            if (display) display.innerText = sub.currentRow;
+            saveProjects();
+            return;
+        }
+        if (target.classList.contains('sub-reset-btn')) {
+            const idx = target.dataset.subidx;
+            const proj = projects.find(p => p.id == currentProjectId);
+            if (!proj || !proj.subprojects[idx]) return;
+            if (confirm('重置该子项目当前行数为0吗？')) {
+                proj.subprojects[idx].currentRow = 0;
+                const display = document.getElementById(`subRowDisplay_${idx}`);
+                if (display) display.innerText = 0;
+                saveProjects();
+            }
+            return;
+        }
+
+        // 附件上传
+        if (target.id === 'addAttachmentBtn') attachUploadInput.click();
+        if (target.id === 'modalClose' || target === modal) modal.classList.remove('active');
+    });
+
+    // input 事件委托：子项目名称、子项目备注
+    document.addEventListener('input', function(e) {
+        const target = e.target;
+        // 子项目名称
+        if (target.classList.contains('sub-name')) {
+            const idx = target.dataset.subidx;
+            const proj = projects.find(p => p.id == currentProjectId);
+            if (proj && proj.subprojects[idx]) {
+                proj.subprojects[idx].name = target.value;
+                saveProjects();
+            }
+            return;
+        }
+        // 子项目备注 (带 data-row 属性)
+        if (target.dataset.row !== undefined && target.closest('.subproject-card')) {
+            const card = target.closest('.subproject-card');
+            const idx = card.querySelector('.collapse-btn')?.dataset.subidx;
+            const proj = projects.find(p => p.id == currentProjectId);
+            if (proj && idx !== undefined && proj.subprojects[idx]) {
+                proj.subprojects[idx].rowsNote[target.dataset.row] = target.value;
+                saveProjects();
+            }
+            return;
+        }
+    });
+
+    // change 事件委托：子项目目标行数
+    document.addEventListener('change', function(e) {
+        const target = e.target;
+        if (target.classList.contains('sub-target-input')) {
+            const idx = target.dataset.subidx;
+            const proj = projects.find(p => p.id == currentProjectId);
+            if (proj && proj.subprojects[idx]) {
+                const newTarget = parseInt(target.value, 10) || 1;
+                proj.subprojects[idx].targetRows = newTarget;
+                fillDefaultRowNotes(proj.subprojects[idx], newTarget);
+                renderSubprojects(proj.subprojects, proj);
+                saveProjects();
+                updateTargetSum(proj);
+            }
+        }
+    });
+
+    // 图片上传
+    projectImagePreview.addEventListener('click', () => imageUploadInput.click());
+    imageUploadInput.addEventListener('change', function(e) {
+        const file = e.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            const proj = projects.find(p => p.id == currentProjectId);
+            if (proj) {
+                proj.image = event.target.result;
+                projectImagePreview.innerHTML = `<img src="${proj.image}" style="width:100%;height:100%;object-fit:cover;">`;
+                saveProjects();
+            }
+        };
+        reader.readAsDataURL(file);
+    });
+    attachUploadInput.addEventListener('change', function(e) {
+        const files = Array.from(e.target.files); if (!files.length) return;
+        const proj = projects.find(p => p.id == currentProjectId); if (!proj) return;
+        let loaded = 0;
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                proj.attachments.push(event.target.result);
+                loaded++;
+                if (loaded === files.length) { renderAttachments(proj.attachments); saveProjects(); }
+            };
+            reader.readAsDataURL(file);
+        });
+    });
+
+    projectNameInput.addEventListener('input', function(e) {
+        const proj = projects.find(p => p.id == currentProjectId);
+        if (proj) { proj.name = this.value; saveProjects(); }
+    });
+
+    // 项目列表渲染
+    function renderProjectList() {
+        projectListEl.innerHTML = '';
+        projects.forEach(proj => {
+            const itemDiv = document.createElement('div'); itemDiv.className = 'project-item';
+            const actionsDiv = document.createElement('div'); actionsDiv.className = 'item-actions';
+            actionsDiv.innerHTML = `<button class="rename-btn" data-id="${proj.id}">✏️重命名</button><button class="delete-btn" data-id="${proj.id}">🗑️删除</button>`;
+            const contentDiv = document.createElement('div'); contentDiv.className = 'item-content';
+            const iconHtml = proj.image ? `<img src="${proj.image}">` : `<span>${proj.icon || '🧶'}</span>`;
+
+            let totalCurrent = proj.currentRow || 0;
+            let totalTarget = proj.targetRows || 1;
+            if (proj.subprojects && proj.subprojects.length) {
+                totalCurrent = proj.subprojects.reduce((sum, sub) => sum + (sub.currentRow || 0), 0);
+                totalTarget = proj.subprojects.reduce((sum, sub) => sum + (sub.targetRows || 0), 0);
+            }
+            const percent = totalTarget ? Math.min(100, Math.round((totalCurrent / totalTarget) * 100)) : 0;
+
+            contentDiv.innerHTML = `
+                <div class="item-icon">${iconHtml}</div>
+                <div class="item-info">
+                    <span class="project-name">${escapeHtml(proj.name)}</span>
+                    <div class="row-info">
+                        <span class="project-row">第 ${totalCurrent} / ${totalTarget} 行</span>
+                        <span class="progress-text">${percent}%</span>
+                    </div>
+                    <div class="progress-container">
+                        <div class="progress-bar" style="width: ${percent}%;"></div>
+                    </div>
+                </div>
+                <button class="edit-btn" data-id="${proj.id}">编辑</button>
+            `;
+            itemDiv.appendChild(actionsDiv); itemDiv.appendChild(contentDiv);
+            projectListEl.appendChild(itemDiv);
+
+            const mc = new Hammer.Manager(contentDiv);
+            mc.add(new Hammer.Swipe({ direction: Hammer.DIRECTION_HORIZONTAL }));
+            mc.on('swipeleft', () => { hideAllSwipedMenus(); contentDiv.classList.add('swiped-left'); });
+            mc.on('swiperight', () => { contentDiv.classList.remove('swiped-left'); });
+        });
+    }
+
+    // 初始化
+    loadFromStorage();
+    renderProjectList();
+})();
+</script>
+</body>
+</html>
